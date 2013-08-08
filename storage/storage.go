@@ -1,7 +1,7 @@
 package storage
 
 import (
-    //"os"
+    "os"
     //. "github.com/jaekwon/go-prelude"
     "github.com/jaekwon/gourami/models"
     "github.com/golang/groupcache/lru"
@@ -28,6 +28,8 @@ type Serializable interface {
 
 /**
  * Storer Implementation
+ * NOTE: There is a basic OSStore provided, but users my want
+ *  to implement a wrapper to use OpenStack Swift.
  */
 
 /* The OSStore works with the OS's filesystem to implement Storer.
@@ -40,12 +42,15 @@ type Serializable interface {
  * Maybe better to measure performance and do what is optimal.
  */
 type OSStore struct {
+    RootDir string
+    Root *File
     DirCache *lru.Cache
 }
 
-func NewOSStore() Storer {
+func NewOSStore(rootDir string) Storer {
     maxEntries := 100
-    s := OSStore{}
+    s := OSStore{RootDir:rootDir}
+    s.Root = 
     s.DirCache = lru.New(maxEntries)
     return &s
 }
