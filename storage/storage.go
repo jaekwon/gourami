@@ -14,9 +14,9 @@ const (
     StorageStatusFailure
 )
 
-/* Storage is an interface... TODO
+/* Storer is an interface... TODO
  */
-type Storage interface {
+type Storer interface {
     Owner() *models.Entity
     Size() (used uint, total uint)
     //Store(*Serializable, chan StorageStatus)
@@ -27,10 +27,10 @@ type Serializable interface {
 }
 
 /**
- * Storage Implementation
+ * Storer Implementation
  */
 
-/* The OSStore works with the OS's filesystem to implement Storage.
+/* The OSStore works with the OS's filesystem to implement Storer.
  * We use the native file system handles defragmentation issues.
  * Since filesystems typically support a maximum number of files per directory,
  *  we handle indexing these files via directory structures.
@@ -43,7 +43,7 @@ type OSStore struct {
     DirCache *lru.Cache
 }
 
-func NewOSStore() Storage {
+func NewOSStore() Storer {
     maxEntries := 100
     s := OSStore{}
     s.DirCache = lru.New(maxEntries)
