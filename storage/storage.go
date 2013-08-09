@@ -43,14 +43,14 @@ type Serializable interface {
  */
 type OSStore struct {
     RootDir string
-    Root *File
+    Root *os.File
     DirCache *lru.Cache
 }
 
 func NewOSStore(rootDir string) Storer {
     maxEntries := 100
     s := OSStore{RootDir:rootDir}
-    s.Root = 
+    //s.Root = 
     s.DirCache = lru.New(maxEntries)
     return &s
 }

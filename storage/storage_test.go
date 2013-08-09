@@ -18,7 +18,7 @@ func RandomData(length uint) []byte {
 }
 
 func TestStoreMany(t *testing.T) {
-    store := NewOSStore()
+    store := NewOSStore("some_path")
 
     for i:=0; i<10; i++ {
         id := RandomData(32)
