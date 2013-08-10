@@ -1,5 +1,7 @@
 Gourami is a secure federated messageing & filesharing system
 
-Todos:
+The protocol design is currently in flux, so come by the IRC channel to discuss!
 
-1. Integrate with http://kylelemons.net/blog/2012/04/22-rx-for-go-headaches.article for dependency versioning.
+`#gourami @ freenode`
+
+There will be more content put up on the [wiki](https://github.com/jaekwon/gourami/wiki) as the design gets hardened.
