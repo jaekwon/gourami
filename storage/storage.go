@@ -2,7 +2,8 @@ package storage
 
 import (
     "os"
-    //. "github.com/jaekwon/go-prelude"
+    "fmt"
+    // . "github.com/jaekwon/go-prelude"
     "github.com/jaekwon/gourami/models"
     "github.com/golang/groupcache/lru"
 )
@@ -47,12 +48,39 @@ type OSStore struct {
     DirCache *lru.Cache
 }
 
-func NewOSStore(rootDir string) Storer {
+func NewOSStore(rootDir string) (Storer, error) {
     maxEntries := 100
     s := OSStore{RootDir:rootDir}
-    //s.Root = 
+
+    // Set s.Root which is the root directory *File
+    var err error
+    s.Root, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
+    if os.IsNotExist(err) {
+        // Does not exist so make new dir
+        err = os.Mkdir(rootDir, os.ModeDir | 0755)
+        s.Root, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
+        if err != nil {
+            return nil, err
+        }
+    }
+    if err != nil {
+        return nil, err
+    }
+
+    // Check s.Root is a valid directory
+    stat, err := s.Root.Stat()
+    if err != nil {
+        s.Root.Close()
+        s.Root = nil
+        return nil, err
+    }
+    if !stat.IsDir() {
+        return nil, fmt.Errorf("%v is not a directory", rootDir)
+    }
+
+    // Set DirCache, for caching directory entries
     s.DirCache = lru.New(maxEntries)
-    return &s
+    return &s, nil
 }
 
 func (*OSStore) Owner() *models.Entity {

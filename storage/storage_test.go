@@ -18,7 +18,11 @@ func RandomData(length uint) []byte {
 }
 
 func TestStoreMany(t *testing.T) {
-    store := NewOSStore("some_path")
+    store, err := NewOSStore("../.testStore")
+
+    if (err != nil) {
+        t.Fatal("Could not create new OSStore:", err)
+    }
 
     for i:=0; i<10; i++ {
         id := RandomData(32)
@@ -27,5 +31,5 @@ func TestStoreMany(t *testing.T) {
                     base64.StdEncoding.EncodeToString(content))
     }
 
-    fmt.Println(store)
+    fmt.Println(store, err)
 }
