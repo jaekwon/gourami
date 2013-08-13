@@ -2,17 +2,15 @@ package storage
 
 import (
     "os"
+    "io/ioutil"
     "fmt"
+    "errors"
+    "path/filepath"
+    "encoding/base64"
     // . "github.com/jaekwon/go-prelude"
+    . "github.com/jaekwon/gourami/types"
     "github.com/jaekwon/gourami/models"
     "github.com/golang/groupcache/lru"
-)
-
-// Enumeration type
-type StorageStatus uint
-const (
-    StorageStatusSuccess StorageStatus = iota
-    StorageStatusFailure
 )
 
 /* Storer is an interface... TODO
@@ -20,11 +18,7 @@ const (
 type Storer interface {
     Owner() *models.Entity
     Size() (used uint, total uint)
-    //Store(*Serializable, chan StorageStatus)
-}
-
-type Serializable interface {
-    Serialize() []byte
+    Store(id Id, data []byte) error
 }
 
 /**
@@ -46,6 +40,36 @@ type OSStore struct {
     RootDir string
     Root *os.File
     DirCache *lru.Cache
+}
+
+func (*OSStore) Owner() *models.Entity {
+    return nil
+}
+
+func (*OSStore) Size() (uint, uint) {
+    return 0, 0
+}
+
+func (this *OSStore) Store(id Id, data []byte) error {
+    path, err := this.PathForId(id)
+    if err != nil {
+        return err
+    }
+    // if file exists...
+    if _, err := os.Stat(path); err == nil {
+        return errors.New(fmt.Sprintf("Could not store. File already exists: %v", path))
+    }
+    err = ioutil.WriteFile(path, data, 0600)
+    return err
+}
+
+func (this *OSStore) PathForId(id Id) (string, error) {
+    if len(id) != 32 {
+        return "", errors.New(fmt.Sprintf("Id was of the wrong length (32). Id: %v", id))
+    }
+    idB64 := base64.URLEncoding.EncodeToString(id)
+    path := filepath.Join(this.RootDir, idB64)
+    return path, nil
 }
 
 func NewOSStore(rootDir string) (Storer, error) {
@@ -83,10 +107,3 @@ func NewOSStore(rootDir string) (Storer, error) {
     return &s, nil
 }
 
-func (*OSStore) Owner() *models.Entity {
-    return nil
-}
-
-func (*OSStore) Size() (uint, uint) {
-    return 0, 0
-}

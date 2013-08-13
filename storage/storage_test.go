@@ -4,7 +4,6 @@ import (
     "fmt"
     "testing"
     "crypto/rand"
-    "encoding/base64"
 )
 
 func RandomData(length uint) []byte {
@@ -26,9 +25,11 @@ func TestStoreMany(t *testing.T) {
 
     for i:=0; i<10; i++ {
         id := RandomData(32)
-        content := RandomData(64)
-        fmt.Println(base64.StdEncoding.EncodeToString(id),
-                    base64.StdEncoding.EncodeToString(content))
+        data := RandomData(64)
+        err := store.Store(id, data)
+        if (err != nil) {
+            fmt.Println("Error! ", err)
+        }
     }
 
     fmt.Println(store, err)
