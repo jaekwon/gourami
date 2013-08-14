@@ -7,7 +7,7 @@ import (
     "errors"
     "path/filepath"
     "encoding/base64"
-    // . "github.com/jaekwon/go-prelude"
+    . "github.com/jaekwon/go-prelude"
     . "github.com/jaekwon/gourami/types"
     "github.com/jaekwon/gourami/models"
     "github.com/golang/groupcache/lru"
@@ -19,6 +19,7 @@ type Storer interface {
     Owner() *models.Entity
     Size() (used uint, total uint)
     Store(id Id, data []byte) error
+    Close() error
 }
 
 /**
@@ -38,7 +39,7 @@ type Storer interface {
  */
 type OSStore struct {
     RootDir string
-    Root *os.File
+    RootFile *os.File
     DirCache *lru.Cache
 }
 
@@ -63,6 +64,10 @@ func (this *OSStore) Store(id Id, data []byte) error {
     return err
 }
 
+func (this *OSStore) Close() error {
+    return this.RootFile.Close()
+}
+
 func (this *OSStore) PathForId(id Id) (string, error) {
     if len(id) != 32 {
         return "", errors.New(fmt.Sprintf("Id was of the wrong length (32). Id: %v", id))
@@ -72,17 +77,30 @@ func (this *OSStore) PathForId(id Id) (string, error) {
     return path, nil
 }
 
+func (this *OSStore) Iterate(ch chan Tuple2) {
+    defer close(ch)
+    files, err := this.RootFile.Readdirnames(0)
+    if err != nil {
+        ch <- Tuple2{nil, err}
+        return
+    }
+    for _, file := range files {
+        ch <- Tuple2{file, nil}
+    }
+    return
+}
+
 func NewOSStore(rootDir string) (Storer, error) {
     maxEntries := 100
     s := OSStore{RootDir:rootDir}
 
-    // Set s.Root which is the root directory *File
+    // Set s.RootFile which is the root directory *File
     var err error
-    s.Root, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
+    s.RootFile, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
     if os.IsNotExist(err) {
         // Does not exist so make new dir
         err = os.Mkdir(rootDir, os.ModeDir | 0755)
-        s.Root, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
+        s.RootFile, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
         if err != nil {
             return nil, err
         }
@@ -91,11 +109,11 @@ func NewOSStore(rootDir string) (Storer, error) {
         return nil, err
     }
 
-    // Check s.Root is a valid directory
-    stat, err := s.Root.Stat()
+    // Check s.RootFile is a valid directory
+    stat, err := s.RootFile.Stat()
     if err != nil {
-        s.Root.Close()
-        s.Root = nil
+        s.RootFile.Close()
+        s.RootFile = nil
         return nil, err
     }
     if !stat.IsDir() {

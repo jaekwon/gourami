@@ -4,6 +4,7 @@ import (
     "fmt"
     "testing"
     "crypto/rand"
+    . "github.com/jaekwon/go-prelude"
 )
 
 func RandomData(length uint) []byte {
@@ -33,4 +34,26 @@ func TestStoreMany(t *testing.T) {
     }
 
     fmt.Println(store, err)
+
+    store.Close()
+}
+
+func TestIterate(t *testing.T) {
+    store, err := NewOSStore("../.testStore")
+
+    if (err != nil) {
+        t.Fatal("Could not create new OSStore:", err)
+    }
+
+    ch := make(chan Tuple2)
+    go store.(*OSStore).Iterate(ch)
+    for t := range ch {
+        id, err := t.Get()
+        if err != nil {
+            fmt.Println(err)
+        }
+        fmt.Println("----> ", id)
+    }
+
+    store.Close()
 }
