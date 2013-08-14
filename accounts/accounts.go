@@ -24,8 +24,8 @@ func GenerateAccount() *Account {
 func (this *Account) String() string {
     idB64 := base64.URLEncoding.EncodeToString(this.Id[:])
     if this.PrivateKey == nil {
-        return fmt.Sprintf("<Account %v>", idB64)
+        return fmt.Sprintf("<Account (%v)>", idB64)
     } else {
-        return fmt.Sprintf("{Account %v}", idB64)
+        return fmt.Sprintf("<Account {%v}>", idB64)
     }
 }

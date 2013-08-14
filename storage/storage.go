@@ -70,7 +70,7 @@ func (this *OSStore) Close() error {
 
 func (this *OSStore) PathForId(id Id) (string, error) {
     if len(id) != 32 {
-        return "", errors.New(fmt.Sprintf("Id was of the wrong length (32). Id: %v", id))
+        return "", errors.New(fmt.Sprintf("Id was of the wrong length (expected 32, got %v).", len(id)))
     }
     idB64 := base64.URLEncoding.EncodeToString(id)
     path := filepath.Join(this.RootDir, idB64)
@@ -85,16 +85,24 @@ func (this *OSStore) Iterate(ch chan Tuple2) {
         return
     }
     for _, file := range files {
-        ch <- Tuple2{file, nil}
+        idBytes, _ := base64.URLEncoding.DecodeString(file)
+        id := Id(idBytes)
+        ch <- Tuple2{id, nil}
     }
     return
+}
+
+func (this *OSStore) GetFile(id Id) (*os.File, error) {
+    path, err := this.PathForId(id)
+    if err != nil { return nil, err }
+    return os.Open(path)
 }
 
 func NewOSStore(rootDir string) (Storer, error) {
     maxEntries := 100
     s := OSStore{RootDir:rootDir}
 
-    // Set s.RootFile which is the root directory *File
+    // Set s.RootFile which is the root directory *os.File
     var err error
     s.RootFile, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
     if os.IsNotExist(err) {
