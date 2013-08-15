@@ -1,23 +1,29 @@
 package storage
 
 import (
+    "os"
 	"database/sql"
 	"errors"
-	"fmt"
-	"log"
-	"sync"
-    "github.com/mattn/go-sqlite3"
+	//"fmt"
+    _ "github.com/mattn/go-sqlite3"
 )
 
-ErrNotFound := errors.New("Not found in index")
+var ErrNotFound error = errors.New("Not found in index")
 
 type Index struct {
 	DB *sql.DB
 }
 
+func (this *Index) Initialize() error {
+    _, err := this.DB.Exec(`CREATE TABLE rows (
+ k VARCHAR(255) NOT NULL PRIMARY KEY,
+ v VARCHAR(255))`)
+    return err
+}
+
 func (this *Index) Transaction() (*Transaction, error) {
 	tx, err := this.DB.Begin()
-	return &Transaction{tx}
+	return &Transaction{tx}, err
 }
 
 func (this *Index) Get(key string) (value string, err error) {
@@ -41,10 +47,7 @@ func (this *Index) Delete(key string) error {
 func (this *Index) Find(key string, ch chan KeyValue) {
     defer close(ch)
     const batchSize = 50
-    rows, err := this.DB.Query(
-        "SELECT k, v FROM rows WHERE k >= ? ORDER BY k LIMIT ?",
-        key, batchSize
-    )
+    rows, err := this.DB.Query("SELECT k, v FROM rows WHERE k >= ? ORDER BY k LIMIT ?", key, batchSize)
     if err != nil {
         ch <- KeyValue{"", "", err}
         return
@@ -58,6 +61,8 @@ func (this *Index) Find(key string, ch chan KeyValue) {
 }
 
 func NewIndex(file string) (*Index, error) {
+    _, err := os.Create(file)
+    if err != nil { return nil, err }
 	db, err := sql.Open("sqlite3", file)
     return &Index{db}, err
 }
@@ -78,7 +83,7 @@ func (this *Transaction) Set(key, value string) error {
     return err
 }
 
-func (this *Transaction) Delete(key string) {
+func (this *Transaction) Delete(key string) error {
 	_, err := this.tx.Exec("DELETE FROM rows WHERE k=?", key)
     return err
 }
