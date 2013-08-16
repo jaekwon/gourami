@@ -6,6 +6,7 @@ import (
 	"errors"
 	//"fmt"
     _ "github.com/mattn/go-sqlite3"
+    "github.com/jaekwon/gourami/types"
 )
 
 var ErrNotFound error = errors.New("Not found in index")
@@ -15,9 +16,17 @@ type Index struct {
 }
 
 func (this *Index) Initialize() error {
-    _, err := this.DB.Exec(`CREATE TABLE rows (
- k VARCHAR(255) NOT NULL PRIMARY KEY,
- v VARCHAR(255))`)
+    _, err := this.DB.Exec(
+    `CREATE TABLE kv (
+        k VARCHAR(255) NOT NULL PRIMARY KEY,
+        v VARCHAR(255)
+    )`)
+    if err != nil { return err }
+    _, err = this.DB.Exec(
+    `CREATE TABLE items (
+        counter INTEGER PRIMARY KEY AUTOINCREMENT,
+        id VARCHAR(44) NOT NULL
+    )`)
     return err
 }
 
@@ -27,7 +36,7 @@ func (this *Index) Transaction() (*Transaction, error) {
 }
 
 func (this *Index) Get(key string) (value string, err error) {
-	err = this.DB.QueryRow("SELECT v FROM rows WHERE k=?", key).Scan(&value)
+	err = this.DB.QueryRow("SELECT v FROM kv WHERE k=?", key).Scan(&value)
 	if err == sql.ErrNoRows {
 		err = ErrNotFound
 	}
@@ -35,29 +44,67 @@ func (this *Index) Get(key string) (value string, err error) {
 }
 
 func (this *Index) Set(key, value string) error {
-	_, err := this.DB.Exec("REPLACE INTO rows (k, v) VALUES (?, ?)", key, value)
+	_, err := this.DB.Exec("REPLACE INTO kv (k, v) VALUES (?, ?)", key, value)
 	return err
 }
 
 func (this *Index) Delete(key string) error {
-	_, err := this.DB.Exec("DELETE FROM rows WHERE k=?", key)
+	_, err := this.DB.Exec("DELETE FROM kv WHERE k=?", key)
 	return err
 }
 
-func (this *Index) Find(key string, ch chan KeyValue) {
+func (this *Index) Find(key string, limit int, ch chan KeyValueErr) {
     defer close(ch)
-    const batchSize = 50
-    rows, err := this.DB.Query("SELECT k, v FROM rows WHERE k >= ? ORDER BY k LIMIT ?", key, batchSize)
+    rows, err := this.DB.Query("SELECT k, v FROM kv WHERE k >= ? ORDER BY k LIMIT ?", key, limit)
     if err != nil {
-        ch <- KeyValue{"", "", err}
+        ch <- KeyValueErr{"", "", err}
         return
     }
     for rows.Next() {
-        var kv KeyValue
-        kv.Err = rows.Scan(&kv.Key, &kv.Value)
-        ch <- kv
+        var kvErr KeyValueErr
+        kvErr.Err = rows.Scan(&kvErr.Key, &kvErr.Value)
+        ch <- kvErr
     }
     return
+}
+
+type KeyValueErr struct {
+    Key string
+    Value string
+    Err error
+}
+
+func (this *Index) AddItem(id types.Id) (lastInsertId int64, err error) {
+    idString, err := id.ToString()
+    if err != nil { return -1, err }
+    result, err := this.DB.Exec("INSERT INTO items (id) VALUES (?)", idString)
+    if err != nil { return -1, err }
+    return result.LastInsertId()
+}
+
+func (this *Index) FindItems(start int64, limit int, ch chan IdErr) {
+    defer close(ch)
+    rows, err := this.DB.Query("SELECT item FROM items WHERE id >= ? ORDER BY k LIMIT ?", start, limit)
+    if err != nil {
+        ch <- IdErr{nil, err}
+        return
+    }
+    for rows.Next() {
+        var idErr IdErr
+        var idString string
+        err = rows.Scan(&idString)
+        if err != nil {
+            ch <- IdErr{nil, err}
+        }
+        idErr.Id, idErr.Err = types.StringToId(idString)
+        ch <- idErr
+    }
+    return
+}
+
+type IdErr struct {
+    Id types.Id
+    Err error
 }
 
 func NewIndex(file string) (*Index, error) {
@@ -67,11 +114,6 @@ func NewIndex(file string) (*Index, error) {
     return &Index{db}, err
 }
 
-type KeyValue struct {
-    Key string
-    Value string
-    Err error
-}
 
 
 type Transaction struct {
@@ -79,12 +121,19 @@ type Transaction struct {
 }
 
 func (this *Transaction) Set(key, value string) error {
-	_, err := this.tx.Exec("REPLACE INTO rows (k, v) VALUES (?, ?)", key, value)
+	_, err := this.tx.Exec("REPLACE INTO kv (k, v) VALUES (?, ?)", key, value)
     return err
 }
 
 func (this *Transaction) Delete(key string) error {
-	_, err := this.tx.Exec("DELETE FROM rows WHERE k=?", key)
+	_, err := this.tx.Exec("DELETE FROM kv WHERE k=?", key)
+    return err
+}
+
+func (this *Transaction) AddItem(id types.Id) error {
+    idString, err := id.ToString()
+    if err != nil { return err }
+    _, err = this.tx.Exec("INSERT INTO items (id) VALUES (?)", idString)
     return err
 }
 

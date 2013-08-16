@@ -8,9 +8,9 @@ import (
     "path/filepath"
     "encoding/base64"
     . "github.com/jaekwon/go-prelude"
+    "github.com/jaekwon/go-prelude/fs"
     . "github.com/jaekwon/gourami/types"
     "github.com/jaekwon/gourami/models"
-    "github.com/golang/groupcache/lru"
 )
 
 /* Storer is an interface... TODO
@@ -39,8 +39,9 @@ type Storer interface {
  */
 type OSStore struct {
     RootDir string
-    RootFile *os.File
-    DirCache *lru.Cache
+    DataDir string
+    DataDirFile *os.File
+    Index *Index
 }
 
 func (*OSStore) Owner() *models.Entity {
@@ -65,7 +66,7 @@ func (this *OSStore) Store(id Id, data []byte) error {
 }
 
 func (this *OSStore) Close() error {
-    return this.RootFile.Close()
+    return this.DataDirFile.Close()
 }
 
 func (this *OSStore) PathForId(id Id) (string, error) {
@@ -73,13 +74,13 @@ func (this *OSStore) PathForId(id Id) (string, error) {
         return "", errors.New(fmt.Sprintf("Id was of the wrong length (expected 32, got %v).", len(id)))
     }
     idB64 := base64.URLEncoding.EncodeToString(id)
-    path := filepath.Join(this.RootDir, idB64)
+    path := filepath.Join(this.DataDir, idB64)
     return path, nil
 }
 
 func (this *OSStore) Iterate(ch chan Tuple2) {
     defer close(ch)
-    files, err := this.RootFile.Readdirnames(0)
+    files, err := this.DataDirFile.Readdirnames(0)
     if err != nil {
         ch <- Tuple2{nil, err}
         return
@@ -99,37 +100,17 @@ func (this *OSStore) GetFile(id Id) (*os.File, error) {
 }
 
 func NewOSStore(rootDir string) (Storer, error) {
-    maxEntries := 100
-    s := OSStore{RootDir:rootDir}
-
-    // Set s.RootFile which is the root directory *os.File
     var err error
-    s.RootFile, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
-    if os.IsNotExist(err) {
-        // Does not exist so make new dir
-        err = os.Mkdir(rootDir, os.ModeDir | 0755)
-        s.RootFile, err = os.OpenFile(rootDir, os.O_RDONLY, os.ModeDir)
-        if err != nil {
-            return nil, err
-        }
-    }
-    if err != nil {
-        return nil, err
-    }
+    dataDir := filepath.Join(rootDir, "data")
 
-    // Check s.RootFile is a valid directory
-    stat, err := s.RootFile.Stat()
-    if err != nil {
-        s.RootFile.Close()
-        s.RootFile = nil
-        return nil, err
-    }
-    if !stat.IsDir() {
-        return nil, fmt.Errorf("%v is not a directory", rootDir)
-    }
+    _, err = fs.EnsureDir(rootDir)
+    if err != nil { return nil, err }
+    dataDirFile, err := fs.EnsureDir(dataDir)
+    if err != nil { return nil, err }
 
-    // Set DirCache, for caching directory entries
-    s.DirCache = lru.New(maxEntries)
-    return &s, nil
+    return &OSStore{
+        RootDir: rootDir,
+        DataDir: dataDir,
+        DataDirFile: dataDirFile,
+    }, nil
 }
-

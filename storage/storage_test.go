@@ -6,7 +6,7 @@ import (
     "crypto/rand"
     "syscall"
     . "github.com/jaekwon/go-prelude"
-    . "github.com/jaekwon/gourami/types"
+    "github.com/jaekwon/gourami/types"
 )
 
 func RandomData(length uint) []byte {
@@ -49,7 +49,7 @@ func TestIterate(t *testing.T) {
     go store.(*OSStore).Iterate(ch)
     for tuple := range ch {
         id_, err := tuple.Get()
-        id := id_.(Id)
+        id := id_.(types.Id)
         if err != nil {
             fmt.Println(err)
         }
