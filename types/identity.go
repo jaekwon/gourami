@@ -1,28 +1,27 @@
-package models
+package types
 
 /* The identity package holds code for server & account identities.
  */
 
 import (
-    . "github.com/jaekwon/gourami/types"
     "code.google.com/p/go.crypto/nacl/box"
     "crypto/rand"
-    "encoding/base64"
+    //"encoding/base64"
     "fmt"
 )
 
 type Identity struct {
-    PublicKey  PublicKey
-    PrivateKey PrivateKey // usually nil
+    PublicKey  *PublicKey
+    PrivateKey *PrivateKey // usually nil
 }
 
 func GenerateIdentity() *Identity {
     pubKey, priKey, _ := box.GenerateKey(rand.Reader)
-    return &Identity{pubKey, priKey}
+    return &Identity{(*PublicKey)(pubKey), (*PrivateKey)(priKey)}
 }
 
 func (this *Identity) String() string {
-    idB64 := base64.URLEncoding.EncodeToString(this.PublicKey[:])
+    idB64 := this.PublicKey.String()
     if this.PrivateKey == nil {
         return fmt.Sprintf("<Identity (%v)>", idB64)
     } else {

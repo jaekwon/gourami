@@ -9,6 +9,12 @@ import (
     "github.com/jaekwon/gourami/types"
 )
 
+var TestIdentity *types.Identity
+
+func init() {
+    TestIdentity = types.GenerateIdentity()
+}
+
 func RandomData(length uint) []byte {
     d := make([]byte, length)
     _, err := rand.Read(d)
@@ -20,7 +26,26 @@ func RandomData(length uint) []byte {
 }
 
 func TestStoreMany(t *testing.T) {
-    store, err := NewOSStore("../.testStore")
+    store, err := NewOSStore("../.testStore", TestIdentity, 999)
+
+    if err != nil {
+        t.Fatal("Could not create new OSStore:", err)
+    }
+
+    // ensure that capacity is set
+    used, capacity := store.Size()
+    if used != 0 {
+        t.Fatal(fmt.Sprintf("Wrong used. Expected 0, got %v", used))
+    }
+    if capacity != 999 {
+        t.Fatal(fmt.Sprintf("Wrong capacity. Expected 999, got %v", capacity))
+    }
+
+    store.Delete()
+}
+
+func TestIterate(t *testing.T) {
+    store, err := NewOSStore("../.testStore", TestIdentity, 999)
 
     if err != nil {
         t.Fatal("Could not create new OSStore:", err)
@@ -33,14 +58,6 @@ func TestStoreMany(t *testing.T) {
         if err != nil {
             fmt.Println("Error! ", err)
         }
-    }
-}
-
-func TestIterate(t *testing.T) {
-    store, err := NewOSStore("../.testStore")
-
-    if err != nil {
-        t.Fatal("Could not create new OSStore:", err)
     }
 
     ch := make(chan Tuple2)
@@ -62,4 +79,6 @@ func TestIterate(t *testing.T) {
         }
         fmt.Printf("----> %v (size: %v, blksize:%v)\n", id, stat.Size, stat.Blksize)
     }
+
+    store.Delete()
 }

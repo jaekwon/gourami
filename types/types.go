@@ -32,6 +32,14 @@ func StringToId(s string) (Id, error) {
     return Id(idSlice), err
 }
 
-// identity keys
-type PublicKey *[32]byte
-type PrivateKey *[32]byte
+type PublicKey  [32]byte
+type PrivateKey [32]byte
+
+func (this *PublicKey) String() string {
+    return base64.URLEncoding.EncodeToString(this[:])
+}
+
+func (this *PrivateKey) String() string {
+    return base64.URLEncoding.EncodeToString(this[:])
+}
+

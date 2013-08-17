@@ -5,20 +5,21 @@ import (
     "io/ioutil"
     "fmt"
     "errors"
+    "strconv"
     "path/filepath"
     "encoding/base64"
     . "github.com/jaekwon/go-prelude"
     "github.com/jaekwon/go-prelude/fs"
     . "github.com/jaekwon/gourami/types"
-    "github.com/jaekwon/gourami/models"
 )
 
 /* Storer is an interface... TODO
  */
 type Storer interface {
-    Owner() *models.Identity
-    Size() (used uint, total uint)
+    Owner() *Identity
+    Size() (used int64, capacity int64)
     Store(id Id, data []byte) error
+    Delete() error
 }
 
 /**
@@ -42,12 +43,17 @@ type OSStore struct {
     Index *Index
 }
 
-func (*OSStore) Owner() *models.Identity {
+func (*OSStore) Owner() *Identity {
     return nil
 }
 
-func (*OSStore) Size() (uint, uint) {
-    return 0, 0
+func (this *OSStore) Size() (int64, int64) {
+    used := int64(0)
+    capstring, err := this.Index.Get(MetaCapacity)
+    if err != nil { return used, int64(-1) }
+    capacity, err := strconv.ParseInt(capstring, 10, 64)
+    if err != nil { return used, int64(-1) }
+    return used, capacity
 }
 
 func (this *OSStore) Store(id Id, data []byte) error {
@@ -103,9 +109,18 @@ func (this *OSStore) GetFile(id Id) (*os.File, error) {
     return os.Open(path)
 }
 
-func NewOSStore(rootDir string) (Storer, error) {
+func (this *OSStore) Delete() error {
+    err := this.Index.Close()
+    if err != nil { return err }
+    err = os.RemoveAll(this.RootDir)
+    return err
+}
+
+func NewOSStore(rootDir string, owner *Identity, capacity int64) (Storer, error) {
     var err error
     dataDir := filepath.Join(rootDir, "data")
+
+    if owner == nil { return nil, errors.New("NewOSStore expected non-nil owner") }
 
     _, err = fs.EnsureDir(rootDir)
     if err != nil { return nil, err }
@@ -114,6 +129,10 @@ func NewOSStore(rootDir string) (Storer, error) {
     indexPath := filepath.Join(rootDir, "index.sqlite")
     index, err := NewIndex(indexPath)
     if err != nil { return nil, err }
+
+    // set meta
+    index.Set(MetaCapacity, strconv.FormatInt(capacity, 10))
+    index.Set(MetaOwner, owner.PublicKey.String())
 
     return &OSStore{
         RootDir: rootDir,
@@ -125,9 +144,24 @@ func NewOSStore(rootDir string) (Storer, error) {
 /* A Storehouser manages many Storers
  */
 type Storehouser interface {
-    AllocateStorer(owner models.Identity, limit uint64) (Storer, error)
-    GetStorer(owner models.Identity) (Storer, error)
+    AllocateStorer(owner *Identity, capacity int64) (Storer, error)
+    GetStorer(owner *Identity) (Storer, error)
 }
 
 type OSStorehouser struct {
+    RootDir string
+}
+
+func (this *OSStorehouser) AllocateStorer(owner *Identity, capacity int64) (Storer, error) {
+    return nil, nil
+}
+
+func (this *OSStorehouser) GetStorer(owner *Identity) (Storer, error) {
+    return nil, nil
+}
+
+func NewOSStorehouser(rootDir string) (Storehouser, error) {
+    _, err := fs.EnsureDir(rootDir)
+    if err != nil { return nil, err }
+    return &OSStorehouser{rootDir}, nil
 }

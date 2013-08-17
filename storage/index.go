@@ -11,12 +11,18 @@ import (
     "github.com/jaekwon/go-prelude/colors"
 )
 
-var ErrNotFound error = errors.New("Not found in index")
-var ErrSchemaUnknown error = errors.New("Schema unknown")
+var (
+    ErrNotFound error = errors.New("Not found in index")
+    ErrSchemaUnknown error = errors.New("Schema unknown")
+)
 
-var CurrentSchemaVersion = 1
+const (
+    CurrentSchemaVersion = 1
 
-var MetaSchemaVersion string = "meta:schema_version"
+    MetaSchemaVersion string = "meta:schema_version"
+    MetaOwner string = "meta:owner"
+    MetaCapacity string = "meta:capacity"
+)
 
 type Index struct {
 	DB *sql.DB
@@ -105,6 +111,10 @@ func (this *Index) Find(key string, limit int, ch chan KeyValueErr) {
         ch <- kvErr
     }
     return
+}
+
+func (this *Index) Close() error {
+    return this.DB.Close()
 }
 
 type KeyValueErr struct {
