@@ -118,3 +118,11 @@ func NewOSStore(rootDir string) (Storer, error) {
         Index: index,
     }, nil
 }
+
+/* A Storehouser manages many Storers
+ */
+type Storehouser interface {
+    AllocateStorer(owner Identity, limit uint64) Storer
+    GetStorer(id Id) (Storer, error)
+    GetStorer(owner Identity)
+}

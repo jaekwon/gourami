@@ -1,6 +1,6 @@
-package accounts
+package identity
 
-/* The accounts package holds code for storage accounts.
+/* The identity package holds code for server & account identities.
  */
 
 import (
@@ -11,21 +11,21 @@ import (
     "fmt"
 )
 
-type Account struct {
+type Identity struct {
     Id PublicKey
     PrivateKey PrivateKey // usually nil
 }
 
-func GenerateAccount() *Account {
+func GenerateIdentity() *Identity {
     pubKey, priKey, _ := box.GenerateKey(rand.Reader)
-    return &Account{pubKey, priKey}
+    return &Identity{pubKey, priKey}
 }
 
-func (this *Account) String() string {
+func (this *Identity) String() string {
     idB64 := base64.URLEncoding.EncodeToString(this.Id[:])
     if this.PrivateKey == nil {
-        return fmt.Sprintf("<Account (%v)>", idB64)
+        return fmt.Sprintf("<Identity (%v)>", idB64)
     } else {
-        return fmt.Sprintf("<Account {%v}>", idB64)
+        return fmt.Sprintf("<Identnty {%v}>", idB64)
     }
 }

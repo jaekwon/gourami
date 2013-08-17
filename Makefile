@@ -6,6 +6,3 @@ test:
 
 test_storage:
 	go test storage/* -v
-
-test_accounts:
-	go test accounts/* -v

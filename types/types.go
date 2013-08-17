@@ -32,6 +32,6 @@ func StringToId(s string) (Id, error) {
     return Id(idSlice), err
 }
 
-// account keys
-type PublicKey *[32]byte
-type PrivateKey *[32]byte
+// identity keys
+type PublicKey []byte
+type PrivateKey []byte
