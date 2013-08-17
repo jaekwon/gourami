@@ -34,8 +34,6 @@ func TestStoreMany(t *testing.T) {
             fmt.Println("Error! ", err)
         }
     }
-
-    store.Close()
 }
 
 func TestIterate(t *testing.T) {
@@ -64,6 +62,4 @@ func TestIterate(t *testing.T) {
         }
         fmt.Printf("----> %v (size: %v, blksize:%v)\n", id, stat.Size, stat.Blksize)
     }
-
-    store.Close()
 }

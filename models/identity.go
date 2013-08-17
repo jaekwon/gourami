@@ -1,4 +1,4 @@
-package identity
+package models
 
 /* The identity package holds code for server & account identities.
  */
@@ -12,7 +12,7 @@ import (
 )
 
 type Identity struct {
-    Id PublicKey
+    PublicKey  PublicKey
     PrivateKey PrivateKey // usually nil
 }
 
@@ -22,7 +22,7 @@ func GenerateIdentity() *Identity {
 }
 
 func (this *Identity) String() string {
-    idB64 := base64.URLEncoding.EncodeToString(this.Id[:])
+    idB64 := base64.URLEncoding.EncodeToString(this.PublicKey[:])
     if this.PrivateKey == nil {
         return fmt.Sprintf("<Identity (%v)>", idB64)
     } else {

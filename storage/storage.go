@@ -16,10 +16,9 @@ import (
 /* Storer is an interface... TODO
  */
 type Storer interface {
-    Owner() *models.Entity
+    Owner() *models.Identity
     Size() (used uint, total uint)
     Store(id Id, data []byte) error
-    Close() error
 }
 
 /**
@@ -40,11 +39,10 @@ type Storer interface {
 type OSStore struct {
     RootDir string
     DataDir string
-    DataDirFile *os.File
     Index *Index
 }
 
-func (*OSStore) Owner() *models.Entity {
+func (*OSStore) Owner() *models.Identity {
     return nil
 }
 
@@ -65,10 +63,6 @@ func (this *OSStore) Store(id Id, data []byte) error {
     return err
 }
 
-func (this *OSStore) Close() error {
-    return this.DataDirFile.Close()
-}
-
 func (this *OSStore) PathForId(id Id) (string, error) {
     if len(id) != 32 {
         return "", errors.New(fmt.Sprintf("Id was of the wrong length (expected 32, got %v).", len(id)))
@@ -78,9 +72,19 @@ func (this *OSStore) PathForId(id Id) (string, error) {
     return path, nil
 }
 
+func (this *OSStore) OpenDataDir() (*os.File, error) {
+    return fs.EnsureDirOpen(this.DataDir)
+}
+
 func (this *OSStore) Iterate(ch chan Tuple2) {
     defer close(ch)
-    files, err := this.DataDirFile.Readdirnames(0)
+    dataDirFile, err := this.OpenDataDir()
+    if err != nil {
+        ch <- Tuple2{nil, err}
+        return
+    }
+    defer dataDirFile.Close()
+    files, err := dataDirFile.Readdirnames(0)
     if err != nil {
         ch <- Tuple2{nil, err}
         return
@@ -105,7 +109,7 @@ func NewOSStore(rootDir string) (Storer, error) {
 
     _, err = fs.EnsureDir(rootDir)
     if err != nil { return nil, err }
-    dataDirFile, err := fs.EnsureDir(dataDir)
+    _, err = fs.EnsureDir(dataDir)
     if err != nil { return nil, err }
     indexPath := filepath.Join(rootDir, "index.sqlite")
     index, err := NewIndex(indexPath)
@@ -114,7 +118,6 @@ func NewOSStore(rootDir string) (Storer, error) {
     return &OSStore{
         RootDir: rootDir,
         DataDir: dataDir,
-        DataDirFile: dataDirFile,
         Index: index,
     }, nil
 }
@@ -122,7 +125,9 @@ func NewOSStore(rootDir string) (Storer, error) {
 /* A Storehouser manages many Storers
  */
 type Storehouser interface {
-    AllocateStorer(owner Identity, limit uint64) Storer
-    GetStorer(id Id) (Storer, error)
-    GetStorer(owner Identity)
+    AllocateStorer(owner models.Identity, limit uint64) (Storer, error)
+    GetStorer(owner models.Identity) (Storer, error)
+}
+
+type OSStorehouser struct {
 }

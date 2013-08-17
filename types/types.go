@@ -33,5 +33,5 @@ func StringToId(s string) (Id, error) {
 }
 
 // identity keys
-type PublicKey []byte
-type PrivateKey []byte
+type PublicKey *[32]byte
+type PrivateKey *[32]byte
