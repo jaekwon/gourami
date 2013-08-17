@@ -107,10 +107,14 @@ func NewOSStore(rootDir string) (Storer, error) {
     if err != nil { return nil, err }
     dataDirFile, err := fs.EnsureDir(dataDir)
     if err != nil { return nil, err }
+    indexPath := filepath.Join(rootDir, "index.sqlite")
+    index, err := NewIndex(indexPath)
+    if err != nil { return nil, err }
 
     return &OSStore{
         RootDir: rootDir,
         DataDir: dataDir,
         DataDirFile: dataDirFile,
+        Index: index,
     }, nil
 }

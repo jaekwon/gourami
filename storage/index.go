@@ -4,19 +4,53 @@ import (
     "os"
 	"database/sql"
 	"errors"
-	//"fmt"
+	"fmt"
+    "strconv"
     _ "github.com/mattn/go-sqlite3"
     "github.com/jaekwon/gourami/types"
+    "github.com/jaekwon/go-prelude/colors"
 )
 
 var ErrNotFound error = errors.New("Not found in index")
+var ErrSchemaUnknown error = errors.New("Schema unknown")
+
+var CurrentSchemaVersion = 1
+
+var MetaSchemaVersion string = "meta:schema_version"
 
 type Index struct {
 	DB *sql.DB
 }
 
-func (this *Index) Initialize() error {
-    _, err := this.DB.Exec(
+func (this *Index) SchemaVersion() (int, error) {
+    value, err := this.Get(MetaSchemaVersion)
+	if err != nil {
+        return -1, ErrSchemaUnknown
+	}
+	return strconv.Atoi(value)
+}
+
+// called by NewIndex
+func (this *Index) initialize() error {
+
+    // nothing to do if schema version is 1
+    schemaVersion, err := this.SchemaVersion()
+    if err == nil {
+        if schemaVersion == CurrentSchemaVersion {
+            return nil
+        } else {
+            // include upgrade path here.
+            return errors.New("Schema version unrecognized")
+        }
+    }
+    if err != nil && err != ErrSchemaUnknown {
+        return err
+    }
+
+    // create new index table...
+
+    fmt.Println(colors.Blue("Initializing Index"))
+    _, err = this.DB.Exec(
     `CREATE TABLE kv (
         k VARCHAR(255) NOT NULL PRIMARY KEY,
         v VARCHAR(255)
@@ -27,6 +61,11 @@ func (this *Index) Initialize() error {
         counter INTEGER PRIMARY KEY AUTOINCREMENT,
         id VARCHAR(44) NOT NULL
     )`)
+    if err != nil { return err }
+
+    // set schema version
+    err = this.Set(MetaSchemaVersion, strconv.Itoa(CurrentSchemaVersion))
+
     return err
 }
 
@@ -111,7 +150,11 @@ func NewIndex(file string) (*Index, error) {
     _, err := os.Create(file)
     if err != nil { return nil, err }
 	db, err := sql.Open("sqlite3", file)
-    return &Index{db}, err
+    if err != nil { return nil, err }
+    index := &Index{db}
+    err = index.initialize()
+    if err != nil { return nil, err }
+    return index, nil
 }
 
 
