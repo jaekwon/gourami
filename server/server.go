@@ -12,5 +12,5 @@ const RECV_BUF_LEN = 1024
 type Server struct {
     Listener Listener
     Identity *Identity
-    Storehouser *storage.Storehouser
+    Storehouser storage.Storehouser
 }

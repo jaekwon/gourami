@@ -32,7 +32,7 @@ func TestStoreMany(t *testing.T) {
         t.Fatal("Could not create new OSStore:", err)
     }
 
-    // ensure that capacity is set
+    // test that capacity is set
     used, capacity := store.Size()
     if used != 0 {
         t.Fatal(fmt.Sprintf("Wrong used. Expected 0, got %v", used))
@@ -40,6 +40,9 @@ func TestStoreMany(t *testing.T) {
     if capacity != 999 {
         t.Fatal(fmt.Sprintf("Wrong capacity. Expected 999, got %v", capacity))
     }
+
+    // test that the identity is correct
+    XXX TODO, ensure that the identity is correct.
 
     store.Delete()
 }
