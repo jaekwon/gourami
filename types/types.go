@@ -31,15 +31,3 @@ func StringToId(s string) (Id, error) {
     idSlice, err := base64.URLEncoding.DecodeString(s)
     return Id(idSlice), err
 }
-
-type PublicKey  [32]byte
-type PrivateKey [32]byte
-
-func (this *PublicKey) String() string {
-    return base64.URLEncoding.EncodeToString(this[:])
-}
-
-func (this *PrivateKey) String() string {
-    return base64.URLEncoding.EncodeToString(this[:])
-}
-

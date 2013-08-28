@@ -41,8 +41,7 @@ func TestStoreMany(t *testing.T) {
         t.Fatal(fmt.Sprintf("Wrong capacity. Expected 999, got %v", capacity))
     }
 
-    // test that the identity is correct
-    XXX TODO, ensure that the identity is correct.
+    // TODO test that the identity is correct
 
     store.Delete()
 }

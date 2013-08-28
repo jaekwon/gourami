@@ -10,15 +10,15 @@ import (
     "encoding/base64"
     . "github.com/jaekwon/go-prelude"
     "github.com/jaekwon/go-prelude/fs"
-    . "github.com/jaekwon/gourami/types"
+    "github.com/jaekwon/gourami/types"
 )
 
 /* Storer is an interface... TODO
  */
 type Storer interface {
-    Owner() *Identity
+    Owner() *types.Identity
     Size() (used int64, capacity int64)
-    Store(id Id, data []byte) error
+    Store(id types.Id, data []byte) error
     Delete() error
 }
 
@@ -43,7 +43,7 @@ type OSStore struct {
     Index *Index
 }
 
-func (*OSStore) Owner() *Identity {
+func (*OSStore) Owner() *types.Identity {
     return nil
 }
 
@@ -56,7 +56,7 @@ func (this *OSStore) Size() (int64, int64) {
     return used, capacity
 }
 
-func (this *OSStore) Store(id Id, data []byte) error {
+func (this *OSStore) Store(id types.Id, data []byte) error {
     path, err := this.PathForId(id)
     if err != nil {
         return err
@@ -69,7 +69,7 @@ func (this *OSStore) Store(id Id, data []byte) error {
     return err
 }
 
-func (this *OSStore) PathForId(id Id) (string, error) {
+func (this *OSStore) PathForId(id types.Id) (string, error) {
     if len(id) != 32 {
         return "", errors.New(fmt.Sprintf("Id was of the wrong length (expected 32, got %v).", len(id)))
     }
@@ -97,13 +97,13 @@ func (this *OSStore) Iterate(ch chan Tuple2) {
     }
     for _, file := range files {
         idBytes, _ := base64.URLEncoding.DecodeString(file)
-        id := Id(idBytes)
+        id := types.Id(idBytes)
         ch <- Tuple2{id, nil}
     }
     return
 }
 
-func (this *OSStore) GetFile(id Id) (*os.File, error) {
+func (this *OSStore) GetFile(id types.Id) (*os.File, error) {
     path, err := this.PathForId(id)
     if err != nil { return nil, err }
     return os.Open(path)
@@ -116,7 +116,7 @@ func (this *OSStore) Delete() error {
     return err
 }
 
-func NewOSStore(rootDir string, owner *Identity, capacity int64) (Storer, error) {
+func NewOSStore(rootDir string, owner *types.Identity, capacity int64) (Storer, error) {
     var err error
     dataDir := filepath.Join(rootDir, "data")
 
@@ -132,7 +132,7 @@ func NewOSStore(rootDir string, owner *Identity, capacity int64) (Storer, error)
 
     // set meta
     index.Set(MetaCapacity, strconv.FormatInt(capacity, 10))
-    index.Set(MetaOwner, owner.PublicKey.String())
+    index.Set(MetaOwner, types.KeyToString(owner.PublicKey))
 
     return &OSStore{
         RootDir: rootDir,
@@ -144,19 +144,19 @@ func NewOSStore(rootDir string, owner *Identity, capacity int64) (Storer, error)
 /* A Storehouser manages many Storers
  */
 type Storehouser interface {
-    AllocateStorer(owner *Identity, capacity int64) (Storer, error)
-    GetStorer(owner *Identity) (Storer, error)
+    AllocateStorer(owner *types.Identity, capacity int64) (Storer, error)
+    GetStorer(owner *types.Identity) (Storer, error)
 }
 
 type OSStorehouser struct {
     RootDir string
 }
 
-func (this *OSStorehouser) AllocateStorer(owner *Identity, capacity int64) (Storer, error) {
+func (this *OSStorehouser) AllocateStorer(owner *types.Identity, capacity int64) (Storer, error) {
     return nil, nil
 }
 
-func (this *OSStorehouser) GetStorer(owner *Identity) (Storer, error) {
+func (this *OSStorehouser) GetStorer(owner *types.Identity) (Storer, error) {
     return nil, nil
 }
 
