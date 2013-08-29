@@ -14,7 +14,10 @@ import (
     "time"
     "crypto/sha512"
     "crypto/rand"
+    //"github.com/jaekwon/go-prelude/colors"
 )
+
+func min(a, b int) int { if a < b { return a }; return b }
 
 /* A Message is the plaintext message. Servers do not have access to this, but
  *  rather have access to the encrypted message in a CipherMessage struct
@@ -59,7 +62,11 @@ func (this *Message) Serialize(writer io.Writer) error {
     if err != nil { return err }
     _, err = writer.Write(headerBytes)
     if err != nil { return err }
+    _, err = this.Content.Seek(int64(0), 0)
+    if err != nil { return err }
     err = binary.Write(writer, binary.BigEndian, uint64(this.Content.Size()))
+    if err != nil { return err }
+    _, err = this.Content.Seek(int64(0), 0)
     if err != nil { return err }
     _, err = io.Copy(writer, this.Content)
     if err != nil { return err }
@@ -68,7 +75,7 @@ func (this *Message) Serialize(writer io.Writer) error {
 
 /* Make a new Message struct from reader
  */
-func Deserialize(reader *io.SectionReader) (*Message, error) {
+func DeserializeMessage(reader *io.SectionReader) (*Message, error) {
     var headerSizeBytes, contentSizeBytes [8]byte
     var headerSize, contentSize uint64
     var header map[string]interface{}
@@ -90,12 +97,15 @@ func Deserialize(reader *io.SectionReader) (*Message, error) {
 }
 
 /* Makes a new Message given header and reader
- * Date and Hash are computed automatically if not present in the header
+ * Required Headers:
+ *  ContentType
+ * Optional headers: FileName
+ *  DateTime, Hash: computed automatically if not present
  */
 func NewMessage(header map[string]interface{}, content *io.SectionReader) *Message {
-    if header["Date"] == nil {
+    if header["DateTime"] == nil {
         now := time.Now()
-        header["Date"] = now.Format(time.RFC3339)
+        header["DateTime"] = now.Format(time.RFC3339)
     }
     if header["Hash"] == nil {
         hasher := sha512.New()
@@ -193,10 +203,11 @@ func (this *CipherMessage) DecipherKey(ident *Identity) (*[32]byte, error) {
     copy(nonce[:], nonceCipherKey[:24])
     cipherKey := nonceCipherKey[24:]
     var key [32]byte
-    _, ok := box.Open(key[:], cipherKey, &nonce, from.PublicKey, ident.PrivateKey)
+    _, ok := box.Open(key[:0], cipherKey, &nonce, from.PublicKey, ident.PrivateKey)
     if !ok {
         return nil, newError("Failure") }
     this.key = &key
+    //fmt.Println(colors.Green(this.key))
     return this.key, nil
 }
 
@@ -228,9 +239,11 @@ func (this *CipherMessage) ReadAt(p []byte, off int64) (n int, err error) {
             }
             log.Printf(" - nonce: %v", nonce)
         }
+        //fmt.Println(colors.Cyan(len(this.chunk), cap(this.chunk)))
         numRead, err := this.Content.ReadAt(this.chunk, 24+chunkStart)
         if err != nil && err != io.EOF { return n, err }
         openedChunk, ok := secretbox.Open(nil, this.chunk[:numRead], &nonce, this.key)
+        //fmt.Println(colors.Cyan("nonce:", nonce, " key:", this.key, " numRead:", numRead))
         if !ok { return n, errors.New(fmt.Sprintf("Failed to decipher chunk %v", chunkIndex)) }
         copied := copy(p, openedChunk[offChunk:])
         p = p[copied:]
@@ -241,8 +254,6 @@ func (this *CipherMessage) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 /* Decipher the Content and return a message.
- * CipherMessage is a ReaderAt, so the returned Message has a Content SectionReader
- * derived from this CipherMessage.
  */
 func (this *CipherMessage) DecipherMessage(ident *Identity) (*Message, error) {
     newError := func(err error) error { return errors.New("Cannot decipher message: " + err.Error()) }
@@ -254,7 +265,9 @@ func (this *CipherMessage) DecipherMessage(ident *Identity) (*Message, error) {
     if err != nil { return nil, newError(err) }
     numChunks := (this.Content.Size() - 24) / chunkSize
     messageSize := this.Content.Size() - 24 - numChunks*secretbox.Overhead
-    return Deserialize(io.NewSectionReader(this, 0, messageSize))
+    // a CipherMessage is a ReaderAt, so the returned Message has a Content SectionReader
+    //  derived from `this`.
+    return DeserializeMessage(io.NewSectionReader(this, 0, messageSize))
 }
 
 /* Encrypt & write message
@@ -279,12 +292,11 @@ func WriteCipherMessage(writer io.Writer, message *Message, from, to *Identity, 
     // calculate CipherText hash
     hasher := sha512.New()
     cipherWriter := NewCipherWriter(hasher, &key, &nonce, chunkSize)
-    cipherMessageSize := cipherWriter.written
-    cipherWriter.Reset()
     err = message.Serialize(cipherWriter)
     if err != nil { return newError(err) }
-    cipherWriter.Close()
+    err = cipherWriter.Close()
     if err != nil { return newError(err) }
+    cipherMessageSize := cipherWriter.written
     hashBytes := hasher.Sum([]byte{})
     hashString := base64.URLEncoding.EncodeToString(hashBytes)
     // encrypt key to CipherKey
@@ -308,15 +320,25 @@ func WriteCipherMessage(writer io.Writer, message *Message, from, to *Identity, 
     if err != nil { return newError(err) }
     _, err = writer.Write(headerBytes)
     if err != nil { return newError(err) }
-    err = binary.Write(writer, binary.BigEndian, uint64(cipherMessageSize))
+    err = binary.Write(writer, binary.BigEndian, uint64(len(nonce))+uint64(cipherMessageSize))
     if err != nil { return newError(err) }
+    _, err = writer.Write(nonce[:])
+    if err != nil { return newError(err) }
+    cipherWriter.Reset()
     cipherWriter.Writer = writer
     err = message.Serialize(cipherWriter)
     if err != nil { return newError(err) }
-    cipherWriter.Close()
+    err = cipherWriter.Close()
     if err != nil { return newError(err) }
     return nil
+}
 
+/* Make a new CipherMessage struct from reader
+ */
+func DeserializeCipherMessage(reader *io.SectionReader) (*CipherMessage, error) {
+    message, err := DeserializeMessage(reader)
+    if err != nil { return nil, err }
+    return &CipherMessage{Message:*message}, nil
 }
 
 /* A CipherWriter encrypts & writes junk to the internal writer field */
@@ -335,7 +357,7 @@ type CipherWriter struct {
 
 func (this *CipherWriter) Reset () {
     this.chunkIndex = int64(0)
-    this.chunk = make([]byte, this.ChunkSize)
+    this.chunk = make([]byte, 0, this.ChunkSize)
     this.written = int64(0)
     copy(this.currentNonce[:], this.Nonce[:])
 }
@@ -352,25 +374,28 @@ func (this *CipherWriter) incrementChunk() {
 }
 
 // encrypt chunk & write, and increment this.Written
-func (this *CipherWriter) encryptWriteChunk() (n int, err error) {
+func (this *CipherWriter) encryptWriteChunk() error {
     cipherChunk := secretbox.Seal(nil, this.chunk, this.Nonce, this.Key)
+    //fmt.Println(colors.Blue("nonce:", this.Nonce, " key:", this.Key))
     written, err := this.Writer.Write(cipherChunk)
-    n += written
     this.written += int64(written)
-    return
+    return err
 }
 
 // encrypt & write through to this.Writer whenever this.chunk is full
 func (this *CipherWriter) Write (p []byte) (n int, err error) {
     for len(p) > 0 {
+        // if chunk is full, encrypt & write
         if len(this.chunk) == cap(this.chunk) {
-            written, err := this.encryptWriteChunk()
-            n += written
+            err := this.encryptWriteChunk()
             if err != nil { return n, err }
             this.incrementChunk()
         }
-        copied := copy(this.chunk, p)
-        p = p[copied:]
+        // fill up the chunk
+        toCopy := min(cap(this.chunk)-len(this.chunk), len(p))
+        this.chunk = append(this.chunk, p[:toCopy]...)
+        n += toCopy
+        p = p[toCopy:]
     }
     return n, nil
 }
@@ -379,7 +404,7 @@ func (this *CipherWriter) Write (p []byte) (n int, err error) {
 // does not close underlying this.Writer.
 func (this *CipherWriter) Close () error {
     if len(this.chunk) > 0 {
-        _, err := this.encryptWriteChunk()
+        err := this.encryptWriteChunk()
         if err != nil { return err }
     }
     return nil
@@ -390,6 +415,7 @@ func NewCipherWriter(writer io.Writer, key *[32]byte, nonce *[24]byte, chunkSize
     cipherWriter := &CipherWriter{}
     cipherWriter.Key = key
     cipherWriter.Nonce = nonce
+    //fmt.Println(colors.Red("Nonce:", nonce))
     cipherWriter.Writer = writer
     cipherWriter.ChunkSize = chunkSize
     cipherWriter.Reset()
