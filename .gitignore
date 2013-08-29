@@ -3,3 +3,5 @@ bak
 *.swp
 .testStore
 foo.go
+gclient
+gserver

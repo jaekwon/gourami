@@ -88,8 +88,8 @@ func TestEncrypt(t *testing.T) {
     // decipher message
     message2, err := cipherMessage.DecipherMessage(to)
     if err != nil { t.Fatal(err) }
-    var m2c bytes.Buffer
-    io.Copy(&m2c, message2.Content)
-    if m2c.String() != messageStr {
-        t.Fatal(fmt.Sprintf("Deciphered message was wrong.\n Expected: %v,\n got: %v", messageStr, m2c.String())) }
+    if message2.ContentString() != messageStr {
+        t.Fatal(fmt.Sprintf("Deciphered message was wrong.\n Expected: %v,\n got: %v", messageStr, message2.ContentString())) }
+    if message2.Header["ContentType"] != "application/octet-stream" {
+        t.Fatal(fmt.Sprintf("Deciphered message content type was wrong")) }
 }

@@ -1,5 +1,5 @@
 all:
-	go build -o gourami && ./gourami
+	go build gclient.go
 
 test:
 	go test ./...
