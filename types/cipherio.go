@@ -1,7 +1,6 @@
 package types
 
 import (
-    //"fmt"
     //"github.com/jaekwon/go-prelude/colors"
     "crypto/rand"
     "io"
